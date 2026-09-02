@@ -1,0 +1,85 @@
+services:
+  frontend:
+    container_name: front
+    ports:
+      - "80:80"
+      - "443:443"
+    build: ./frontend
+    restart: always
+    depends_on:
+      - backend
+    volumes:
+      - certs:/etc/letsencrypt:ro
+      - certbot-challenge:/var/www/certbot
+
+
+  backend:
+    build: ./backend
+    container_name: back
+    restart: always
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      LIBRETRANSLATE_URL: ${LIBRETRANSLATE_URL}
+      DICTIONARY_SOURCE_BASE_URL: ${DICTIONARY_SOURCE_BASE_URL}
+      DICTIONARY_SOURCE_FILES: ${DICTIONARY_SOURCE_FILES}
+    depends_on:
+      bd:
+        condition: service_healthy
+
+  bd:
+    image: docker.io/postgres:16-alpine
+    container_name: mybd
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  libretranslate:
+    image: docker.io/libretranslate/libretranslate
+    container_name: translate
+    ports:
+      - "5000:5000"
+    environment:
+      LT_LOAD_ONLY: ${LT_LOAD_ONLY}
+    restart: always
+    volumes:
+      - libretranslate:/home/libretranslate/.local/share/argos-translate
+
+  pgadmin:
+    image: docker.io/dpage/pgadmin4
+    container_name: pgadmin
+    restart: always
+    ports:
+      - "4567:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      bd:
+        condition: service_healthy
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 --url http://frontend
+    depends_on:
+      - frontend
+
+
+volumes:
+  postgres_data:
+  libretranslate:
+  pgadmin:
+  certs:
+  certbot-challenge:

@@ -1,0 +1,7 @@
+node_modules/
+.env
+
+# Генерируется автоматически из scripts/fetch-source-dictionary.js /
+# ensure-dictionary.js при старте backend (см. docs/INFRA.md) — не коммитим,
+# каждый разворачивает у себя сам.
+data/

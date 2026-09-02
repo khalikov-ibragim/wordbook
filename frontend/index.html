@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FDF7EC" id="themeColorMeta">
+<title>Wordbook — словарь-блокнот</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__mark">WB</span>
+      <span class="topbar__title">wordbook</span>
+    </div>
+    <div class="topbar__badges">
+      <span id="dictStatus" class="dict-status"></span>
+      <span id="netStatus" class="net-status net-status--online">online</span>
+      <button type="button" id="practiceBtn" class="icon-btn" aria-label="Тренировка" title="Повторить слова карточками">🧠</button>
+      <button type="button" id="appearanceBtn" class="icon-btn" aria-label="Оформление" title="Цвет, фон, шрифт, размер текста">🎨</button>
+      <button type="button" id="themeToggle" class="icon-btn" aria-label="Переключить тему" title="Светлая/тёмная тема">🌙</button>
+      <button type="button" id="settingsBtn" class="icon-btn" aria-label="Настройки" title="Настройки">⚙️</button>
+    </div>
+  </header>
+
+  <form id="inputForm" class="input-bar" autocomplete="off">
+    <input
+      id="wordInput"
+      class="input-bar__field"
+      type="text"
+      placeholder="слово или фраза…"
+      required
+    >
+    <button type="submit" class="input-bar__submit" id="submitBtn">→</button>
+  </form>
+
+  <p id="previewLine" class="preview-line" hidden></p>
+
+  <button type="button" id="contextToggle" class="context-toggle">+ добавить контекст (откуда слово)</button>
+  <input
+    id="contextInput"
+    class="context-input"
+    type="text"
+    placeholder="например: строка из документации, где встретилось слово…"
+    hidden
+  >
+
+  <p id="inputHint" class="input-hint"></p>
+
+  <div id="manualPanel" class="manual-panel" hidden>
+    <p class="manual-panel__text">Перевод не найден автоматически — можно вписать свой:</p>
+    <div class="manual-panel__row">
+      <input id="manualTranslation" class="manual-panel__field" type="text" placeholder="твой перевод…">
+      <button type="button" id="manualSave" class="manual-panel__save">Сохранить</button>
+    </div>
+    <button type="button" id="manualCancel" class="manual-panel__cancel">Отмена</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="filters" id="filters">
+      <button class="chip chip--active" data-status="">все <span class="chip__count"></span></button>
+      <button class="chip" data-status="learning">учу <span class="chip__count"></span></button>
+      <button class="chip" data-status="read">прочтено <span class="chip__count"></span></button>
+      <button class="chip" data-status="learned">изучено <span class="chip__count"></span></button>
+      <button class="chip" data-status="reviewing">вспоминаю <span class="chip__count"></span></button>
+    </div>
+    <input id="searchInput" class="search" type="search" placeholder="поиск…">
+  </div>
+
+  <div class="stats" id="stats">всего: —</div>
+
+  <main class="entries" id="entries">
+    <p class="empty-state">Записей пока нет — впиши первое слово выше.</p>
+  </main>
+
+</div>
+
+<template id="entryTemplate">
+  <article class="ticket" data-id="">
+    <div class="ticket__stub"></div>
+    <div class="ticket__body" tabindex="0" role="button" aria-haspopup="dialog">
+      <div class="ticket__preview">
+        <div class="ticket__row">
+          <span class="ticket__source"></span>
+          <span class="ticket__arrow">→</span>
+          <span class="ticket__translated"></span>
+        </div>
+        <p class="ticket__context"></p>
+      </div>
+      <span class="ticket__expand-hint">развернуть ⌄</span>
+      <div class="ticket__meta">
+        <span class="ticket__status-badge"></span>
+        <span class="ticket__pending-badge">офлайн, ждёт синка</span>
+      </div>
+    </div>
+    <button class="ticket__menu-btn" aria-label="меню">⋯</button>
+    <div class="ticket__menu">
+      <button data-action="edit">Изменить</button>
+      <div class="ticket__menu-statuses">
+        <button data-action="status" data-status="learning">учу</button>
+        <button data-action="status" data-status="read">прочтено</button>
+        <button data-action="status" data-status="learned">изучено</button>
+        <button data-action="status" data-status="reviewing">вспоминаю</button>
+      </div>
+      <button data-action="delete" class="ticket__menu-danger">Удалить</button>
+    </div>
+  </article>
+</template>
+
+<!-- Модалка редактирования — заменяет старый prompt() (неудобно на телефоне) -->
+<div id="editModal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <h2 id="editModalTitle" class="modal__title">Изменить перевод</h2>
+    <p id="editModalSource" class="modal__source"></p>
+    <input id="editModalField" class="modal__field" type="text">
+    <label class="modal__label" for="editModalContext">Контекст (необязательно)</label>
+    <input id="editModalContext" class="modal__field" type="text" placeholder="предложение-источник…">
+    <div class="modal__actions">
+      <button type="button" id="editModalCancel" class="modal__btn modal__btn--ghost">Отмена</button>
+      <button type="button" id="editModalSave" class="modal__btn modal__btn--primary">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Просмотр записи целиком — открывается по клику на карточку -->
+<div id="viewModal" class="modal-backdrop" hidden>
+  <div class="modal modal--view" role="dialog" aria-modal="true" aria-labelledby="viewModalSource">
+    <div class="modal__view-top">
+      <span id="viewModalStatus" class="ticket__status-badge"></span>
+      <button type="button" id="viewModalClose" class="icon-btn modal__close" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal__view-body">
+      <p id="viewModalSource" class="modal__view-source"></p>
+      <p class="modal__view-arrow">→</p>
+      <p id="viewModalTranslated" class="modal__view-translated"></p>
+      <p id="viewModalContext" class="modal__view-context"></p>
+    </div>
+    <div class="modal__view-statuses" id="viewModalStatuses">
+      <button data-status="learning">учу</button>
+      <button data-status="read">прочтено</button>
+      <button data-status="learned">изучено</button>
+      <button data-status="reviewing">вспоминаю</button>
+    </div>
+    <div class="modal__actions modal__actions--spread">
+      <button type="button" id="viewModalPrev" class="modal__btn modal__btn--ghost" aria-label="Предыдущее слово">◂</button>
+      <div class="modal__view-main-actions">
+        <button type="button" id="viewModalCopy" class="modal__btn modal__btn--ghost">Скопировать</button>
+        <button type="button" id="viewModalEdit" class="modal__btn modal__btn--ghost">Изменить</button>
+        <button type="button" id="viewModalDelete" class="modal__btn modal__btn--danger">Удалить</button>
+      </div>
+      <button type="button" id="viewModalNext" class="modal__btn modal__btn--ghost" aria-label="Следующее слово">▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- Оформление: палитра, фон, шрифт, размер текста -->
+<div id="appearanceModal" class="modal-backdrop" hidden>
+  <div class="modal modal--appearance" role="dialog" aria-modal="true" aria-labelledby="appearanceModalTitle">
+    <h2 id="appearanceModalTitle" class="modal__title">Оформление</h2>
+
+    <p class="modal__label modal__label--section">Цветовая пара</p>
+    <div class="swatch-row" id="paletteOptions"></div>
+
+    <p class="modal__label modal__label--section">Фон <span id="appearanceBgThemeHint" class="modal__label-hint"></span></p>
+    <div class="swatch-row" id="bgOptions"></div>
+
+    <p class="modal__label modal__label--section">Шрифт</p>
+    <div class="pill-row" id="fontOptions"></div>
+
+    <p class="modal__label modal__label--section">Размер текста</p>
+    <div class="pill-row" id="sizeOptions"></div>
+
+    <div class="modal__actions">
+      <button type="button" id="appearanceReset" class="modal__btn modal__btn--ghost">Сбросить</button>
+      <button type="button" id="appearanceClose" class="modal__btn modal__btn--primary">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- Настройки: API-ключ бэкенда, если на сервере включена авторизация -->
+<div id="settingsModal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <h2 id="settingsModalTitle" class="modal__title">Настройки</h2>
+    <label class="modal__label" for="apiKeyField">API-ключ (если включена авторизация на сервере)</label>
+    <input id="apiKeyField" class="modal__field" type="password" placeholder="оставь пустым, если авторизация выключена" autocomplete="off">
+    <p class="modal__hint">Ключ хранится только в этом браузере (localStorage) и подставляется в заголовок X-API-Key ко всем запросам.</p>
+    <div class="modal__actions">
+      <button type="button" id="settingsCancel" class="modal__btn modal__btn--ghost">Отмена</button>
+      <button type="button" id="settingsSave" class="modal__btn modal__btn--primary">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Режим тренировки: полноэкранный оверлей (не модалка с фоном), три экрана внутри -->
+<div id="practiceOverlay" class="practice-overlay" hidden>
+
+  <div id="practiceSetup" class="practice-setup">
+    <button type="button" id="practiceSetupClose" class="icon-btn practice-overlay__close" aria-label="Закрыть">✕</button>
+    <h2 class="practice-setup__title">Тренировка</h2>
+    <p class="practice-setup__label">Какие слова повторяем?</p>
+    <div class="practice-setup__statuses" id="practiceStatusChecks">
+      <label class="practice-check"><input type="checkbox" value="learning"> учу <span class="practice-check__count" data-count="learning"></span></label>
+      <label class="practice-check"><input type="checkbox" value="read"> прочтено <span class="practice-check__count" data-count="read"></span></label>
+      <label class="practice-check"><input type="checkbox" value="learned"> изучено <span class="practice-check__count" data-count="learned"></span></label>
+      <label class="practice-check"><input type="checkbox" value="reviewing"> вспоминаю <span class="practice-check__count" data-count="reviewing"></span></label>
+    </div>
+    <label class="practice-check practice-setup__shuffle">
+      <input type="checkbox" id="practiceShuffle" checked> перемешать порядок
+    </label>
+    <p id="practiceSetupEmpty" class="practice-setup__empty" hidden>По выбранным статусам слов нет — отметь другой набор.</p>
+    <button type="button" id="practiceStart" class="practice-setup__start">Начать</button>
+  </div>
+
+  <div id="practiceSession" class="practice-session" hidden>
+    <div class="practice-session__top">
+      <button type="button" id="practiceExit" class="icon-btn practice-overlay__close" aria-label="Закрыть тренировку">✕</button>
+      <span class="practice-progress" id="practiceProgressText" aria-live="polite">1 / 1</span>
+      <span class="practice-session__spacer"></span>
+    </div>
+
+    <div class="practice-card-wrap">
+      <div id="practiceCard" class="flip-card" tabindex="0" role="button" aria-label="Карточка слова — нажми или Space, чтобы перевернуть">
+        <div class="flip-card__inner" id="flipCardInner">
+          <div class="flip-card__front">
+            <p class="flip-card__word" id="practiceFrontWord"></p>
+            <p class="flip-card__context" id="practiceFrontContext"></p>
+          </div>
+          <div class="flip-card__back">
+            <p class="flip-card__word" id="practiceBackWord"></p>
+            <p class="flip-card__context" id="practiceBackContext"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="practice-assess" id="practiceAssess" hidden>
+      <button type="button" id="practiceForgot" class="practice-assess__btn practice-assess__btn--forgot">Забыл</button>
+      <button type="button" id="practiceRemember" class="practice-assess__btn practice-assess__btn--remember">Помню</button>
+    </div>
+
+    <div class="practice-nav">
+      <button type="button" id="practicePrev" class="practice-nav__btn">← назад</button>
+      <button type="button" id="practiceNext" class="practice-nav__btn">дальше →</button>
+    </div>
+  </div>
+
+  <div id="practiceDone" class="practice-done" hidden>
+    <p class="practice-done__title">Готово! 🎉</p>
+    <p class="practice-done__text" id="practiceDoneText"></p>
+    <div class="practice-done__actions">
+      <button type="button" id="practiceAgain" class="practice-setup__start">Ещё раз</button>
+      <button type="button" id="practiceCloseDone" class="modal__btn modal__btn--ghost">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
