@@ -33,3 +33,10 @@ jobs:
           done
           echo "backend did not start in time"
           exit 1
+
+      - name: testing working my project
+        run: docker compose exec -T backend node.js test_file.py | tee test_file.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: test_file.txt
