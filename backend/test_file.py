@@ -31,10 +31,6 @@ def main(): #Создание функции с именем main
     print(f"[OK] post -> {r.status_code}")
 
 
-    r = requests.delete(f"{BASE}/api/entries/{file_id}")
-    assert r.status_code == 204, f"delete: ожидал 200 но получил {r.status_code}"
-    print(f"[OK] delete -> {r.status_code}")
-
     r = requests.patch(f"{BASE}/api/entries/{file_id}", json={
         "source_text": "day",
         "translated_text": "день",
@@ -50,6 +46,9 @@ def main(): #Создание функции с именем main
     assert r.status_code == 200, f"get: ожидал 200 но получил {r.status_code}"
     print(f"[OK] get -> {r.status_code}")
 
+    r = requests.delete(f"{BASE}/api/entries/{file_id}")
+    assert r.status_code == 204, f"delete: ожидал 200 но получил {r.status_code}"
+    print(f"[OK] delete -> {r.status_code}")
 
 if __name__ == "__main__":
     main()
