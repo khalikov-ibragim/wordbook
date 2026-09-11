@@ -35,7 +35,9 @@ jobs:
           exit 1
 
       - name: testing working my project
-        run: docker compose exec -T backend python test_file.py | tee test_file.txt
+        run: sudo apt-get update && sudo apt-get install -y python3-requests
+      - name: run test
+        run: python3 test_file.py  |  tee test_file.txt
       - uses: actions/upload-artifact@v4
         with:
           name: report
@@ -52,8 +54,8 @@ jobs:
           docker push glimpl/wordbook-backend:latest
       - name: build and push my frontend
         run: |
-          docker tag wordbook-backend glimpl/wordbook-frontend:latest
-          docker push glimpl/wordbook-frontend
+          docker tag wordbook-frontend glimpl/wordbook-frontend:latest
+          docker push glimpl/wordbook-frontend:latest
   deploy:
     runs-on: self-hosted
     needs: [basic]
