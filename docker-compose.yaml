@@ -41,6 +41,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
 
   libretranslate:
     image: docker.io/libretranslate/libretranslate
