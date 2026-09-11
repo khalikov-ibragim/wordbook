@@ -12,6 +12,9 @@ jobs:
       - name: build container
         run: docker compose build
 
+      - name: copy .env
+        run: copy env.example .env
+
       - name: run docker compose
         run: docker compose up -d
 
