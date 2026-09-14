@@ -48,13 +48,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: build and push my backend
+      - name: push my backend
         run: |
-          docker tag wordbook-backend glimpl/wordbook-backend:latest
           docker push glimpl/wordbook-backend:latest
-      - name: build and push my frontend
+      - name: push my frontend
         run: |
-          docker tag wordbook-frontend glimpl/wordbook-frontend:latest
           docker push glimpl/wordbook-frontend:latest
   deploy:
     runs-on: self-hosted
