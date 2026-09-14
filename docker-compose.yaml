@@ -3,7 +3,6 @@ services:
     container_name: front
     ports:
       - "80:80"
-      - "443:443"
     build: ./frontend
     restart: always
     depends_on:
