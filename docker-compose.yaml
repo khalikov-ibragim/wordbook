@@ -3,6 +3,7 @@ services:
     container_name: front
     ports:
       - "80:80"
+    image: glimpl/wordbook-frontend:latest
     build: ./frontend
     restart: always
     depends_on:
@@ -11,6 +12,7 @@ services:
 
   backend:
     build: ./backend
+    image: glimpl/wordbook-backend:latest
     container_name: back
     restart: always
     environment:
