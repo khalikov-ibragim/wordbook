@@ -7,9 +7,6 @@ services:
     restart: always
     depends_on:
       - backend
-    volumes:
-      - certs:/etc/letsencrypt:ro
-      - certbot-challenge:/var/www/certbot
 
 
   backend:
