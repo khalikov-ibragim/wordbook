@@ -19,3 +19,8 @@ npm-debug.log*
 # Build
 dist/
 build/
+
+.venv/
+
+.terraform/
+*.tfstate
