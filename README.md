@@ -9,7 +9,7 @@ Self-hosted PWA dictionary (EN↔RU) with offline support, built for daily langu
 - **LibreTranslate** — self-hosted translation (Argos models)
 - **PostgreSQL** — word storage with trigram search (`pg_trgm`)
 - **Cloudflare Tunnel** — public HTTPS access without port forwarding
-- **TLS** — Let's Encrypt via certbot + DuckDNS
+- **TLS** — HTTPS via Cloudflare Tunnel
 - **Telegram alerts** — health-check notifications
 - **API Key auth** — simple header-based authentication
 
@@ -20,8 +20,8 @@ Self-hosted PWA dictionary (EN↔RU) with offline support, built for daily langu
 | Frontend | Vanilla JS, PWA (Service Worker + Manifest), IndexedDB |
 | Backend | Node.js, Express, PostgreSQL |
 | Translation | LibreTranslate (self-hosted) |
-| Reverse Proxy | Nginx |
-| TLS | Certbot + DuckDNS (DNS-01) |
+| Reverse Proxy | Nginx (frontend container) |
+| TLS | Cloudflare Tunnel |
 | Tunnel | Cloudflare Tunnel (cloudflared) |
 | Database | PostgreSQL 16 with `pg_trgm` extension |
 

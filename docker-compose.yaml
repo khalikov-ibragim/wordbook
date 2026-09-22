@@ -16,14 +16,20 @@ services:
     container_name: back
     restart: always
     environment:
+      PORT: ${PORT}
+      API_KEY: ${API_KEY}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
+      AUTO_IMPORT_DICTIONARY: ${AUTO_IMPORT_DICTIONARY}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       LIBRETRANSLATE_URL: ${LIBRETRANSLATE_URL}
+      LIBRETRANSLATE_API_KEY: ${LIBRETRANSLATE_API_KEY}
       DICTIONARY_SOURCE_BASE_URL: ${DICTIONARY_SOURCE_BASE_URL}
       DICTIONARY_SOURCE_FILES: ${DICTIONARY_SOURCE_FILES}
+      DEVICE_BUNDLE_LIMIT_PER_FILE: ${DEVICE_BUNDLE_LIMIT_PER_FILE}
     depends_on:
       bd:
         condition: service_healthy
@@ -80,5 +86,3 @@ volumes:
   postgres_data:
   libretranslate:
   pgadmin:
-  certs:
-  certbot-challenge:

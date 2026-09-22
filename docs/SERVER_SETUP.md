@@ -1,177 +1,104 @@
-# Настройка сервера — Wordbook (без docker)
+# Настройка сервера — Wordbook (docker compose)
 
-Рассчитано на Ubuntu/Debian-подобную систему (домашний мини-сервер,
-старый ноутбук, рабочая машина или дешёвый VPS — разница только в шаге
-про проброс порта наружу). Дальше — по шагам.
+Деплой через `docker compose` прямо из репозитория. Всё необходимое
+(nginx, Node, PostgreSQL, LibreTranslate, pgAdmin, Cloudflare-туннель)
+живёт в образах — на хосте нужен только docker/podman с compose-плагином.
 
-## 1. Node.js 20 LTS
+## 1. Что нужно на хосте
 
+- Linux (Ubuntu/Debian и подобные — как настройка самого docker, так и
+  rest сервисов в контейнерах не зависят от конкретной ОС).
+- docker с compose-плагином **или** podman + podman-compose.
+- Доступ к интернету (docker pull образов).
+- (Опционально) домен/DuckDNS для публичного доступа через туннель.
+
+Проверка:
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-node -v   # должно быть 20.x
+docker compose version    # или podman-compose --version
 ```
 
-## 2. PostgreSQL
+## 2. Клонировать репозиторий
 
 ```bash
-sudo apt-get install -y postgresql postgresql-contrib
-sudo systemctl enable --now postgresql
-
-sudo -u postgres psql -c "CREATE USER wordbook_user WITH PASSWORD 'придумай-пароль';"
-sudo -u postgres psql -c "CREATE DATABASE wordbook OWNER wordbook_user;"
+git clone https://github.com/khalikov-ibragim/wordbook.git
+cd wordbook
 ```
 
-Применить схему:
+## 3. Настроить окружение
 
 ```bash
-psql -U wordbook_user -d wordbook -h localhost -f backend/src/schema.sql
-```
-
-## 3. Backend
-
-```bash
-cd backend
 cp .env.example .env
-# открыть .env, вписать DATABASE_URL с паролем из шага 2
+# открыть .env, вписать свои значения (пароли Postgres, API_KEY, и т.д.)
+```
 
-# Сервер будет открыт наружу через nginx — сразу сгенерируй и впиши API_KEY,
-# иначе /api/* останется без авторизации (backend напомнит об этом в логе):
+Сразу сгенерируй и впиши `API_KEY` (сервер будет открыт через туннель —
+без ключа `/api/*` останется без авторизации, backend напомнит в логе):
+
+```bash
 openssl rand -hex 24   # результат вписать в .env → API_KEY
-
-npm install
-node src/server.js   # проверка руками: curl http://localhost:3000/api/health
 ```
 
-При первом запуске (если в `.env` оставлен `AUTO_IMPORT_DICTIONARY=true`,
-что по умолчанию) backend сам скачает и загрузит словарь в фоне — в
-логе будет видно прогресс, сервер при этом отвечает сразу, ждать
-загрузки не нужно. Подробности и как отключить/перезалить — в
-`docs/INFRA.md` ("Данные для словаря").
-
-Если всё ок — держим процесс живым через systemd (переживёт перезагрузку
-и упадёт — сам перезапустится):
-
-```ini
-# /etc/systemd/system/wordbook-backend.service
-[Unit]
-Description=Wordbook backend
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=твой-пользователь
-WorkingDirectory=/путь/до/wordbook/backend
-ExecStart=/usr/bin/node src/server.js
-Restart=on-failure
-EnvironmentFile=/путь/до/wordbook/backend/.env
-
-[Install]
-WantedBy=multi-user.target
-```
+## 4. Запустить
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now wordbook-backend
-sudo systemctl status wordbook-backend
+docker compose up -d          # или podman-compose up -d
+docker compose ps             # все контейнеры healthy?
 ```
 
-## 4. (Опционально) свой LibreTranslate вместо публичного
+При первом старте:
+- `bd` разворачивает схему из `backend/src/schema.sql`
+  (`docker-entrypoint-initdb.d`);
+- если в `.env` оставлен `AUTO_IMPORT_DICTIONARY=true` (по умолчанию),
+  backend сам скачает и загрузит словарь в фоне — в логе будет виден
+  прогресс, сервер при этом отвечает сразу, ждать не нужно. Подробнее —
+  в `docs/INFRA.md` («Данные для словаря»).
 
-Публичный `libretranslate.com` работает из коробки, но с лимитами и
-иногда просит платный ключ. Свой инстанс без docker ставится через pip:
+Проверка руками:
+```bash
+docker compose logs backend      # живой ли, что пишет
+curl http://localhost:80/api/health   # через frontend-nginx, без ключа (единственный открытый эндпоинт)
+curl -X POST http://localhost:80/api/translate \
+     -H "Content-Type: application/json" \
+     -H "X-API-Key: тот-же-ключ-что-в-.env" \
+     -d '{"text":"hello"}'
+```
+
+Замечание: frontend-nginx слушает порт 80 на хосте; внутри docker-сети он
+проксирует `/api` на `backend:3000`.
+
+## 5. Перезапуск / обновления
 
 ```bash
-sudo apt-get install -y python3-pip
-pip install libretranslate --break-system-packages
-libretranslate --host 127.0.0.1 --port 5001
+docker compose down       # остановить (тома с данными сохраняются)
+docker compose up -d      # поднять снова / подтянуть новые образы
+docker compose pull && docker compose up -d   # обновить до последних образов
 ```
 
-(тоже стоит завернуть в systemd-сервис по аналогии с backend, если
-решишь оставить его постоянно включённым — он прожорливый по памяти
-из-за моделей перевода, так что на слабом домашнем сервере подумай,
-нужен ли он вообще, публичного API может быть достаточно).
+Никогда не делай `docker compose down -v` на истории/проде — удалит том
+`postgres_data` вместе с записями (см. раздел про бэкапы в `INFRA.md`).
 
-Если поднял — поменяй в `backend/.env`:
-```
-LIBRETRANSLATE_URL=http://localhost:5001/translate
-```
+## 6. Публичный доступ (HTTPS без проброса портов)
 
-## 5. Frontend
+По умолчанию доступ открывается через **Cloudflare Tunnel**: сервис
+`cloudflared` в `docker-compose.yaml` проксирует запросы на контейнер
+`frontend` (nginx, порт 80). Порт 80 на роутере пробрасывать не нужно.
 
-Статика — ничего собирать не нужно, это просто HTML/CSS/JS. Копируем
-папку `frontend/` туда, откуда её будет отдавать nginx:
+Туннель — двусторонний: машина сама устанавливает исходящее соединение
+с облаком Cloudflare, поэтому порты наружу открывать не требуется.
+Настройка домена, привязанного к туннелю, — в процессе настройки самого
+cloudflared (вне этого репозитория).
+
+Локально проект отвечает на `http://localhost` (порт 80).
+
+Альтернативный вариант (традиционный, с пробросом 443/80): frontend-nginx
+проксирует `/api` на backend, внешний DNS и Let's Encrypt настраиваются
+на хосте — но при использовании туннеля это не нужно.
+
+## 7. Проверка, что всё вместе работает
 
 ```bash
-sudo mkdir -p /var/www/wordbook
-sudo cp -r frontend/* /var/www/wordbook/
-```
-
-## 6. nginx — reverse proxy + статика
-
-```bash
-sudo apt-get install -y nginx
-```
-
-```nginx
-# /etc/nginx/sites-available/wordbook
-server {
-    listen 80;
-    server_name твой-домен-или-IP;
-
-    root /var/www/wordbook;
-    index index.html;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:3000/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/wordbook /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## 7. HTTPS (нужен обязательно — PWA и service worker без HTTPS не
-    установятся, кроме localhost)
-
-Если есть свой домен:
-
-```bash
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d твой-домен
-```
-
-Certbot сам допишет конфиг nginx под 443 и настроит автопродление.
-
-Если домена нет (чисто домашний сервер) — вариантов два:
-- завести бесплатный поддомен (DuckDNS, No-IP и т.п.) и получить
-  сертификат так же через certbot;
-- либо использовать self-signed сертификат — тогда браузер будет ругаться
-  при каждом заходе, PWA всё равно установится, но с предупреждением.
-
-## 8. Доступ снаружи (если сервер дома, не на статике)
-
-- Пробросить порт 443 (и 80 для certbot) на сервер в настройках роутера.
-- Если провайдер даёт динамический IP — нужен DDNS-клиент (та же
-  DuckDNS умеет автоматически обновлять IP).
-- Если сервер стоит на работе за корпоративным NAT — обычно проще
-  наоборот: заходить туда через VPN/Tailscale, а не пробрасывать порт
-  наружу — вопрос политики конкретного места, тут решать на месте.
-
-## 9. Проверка, что всё вместе работает
-
-```bash
-curl https://твой-домен/api/health          # {"ok":true}, без ключа — это единственный открытый эндпоинт
-curl -X POST https://твой-домен/api/translate \
+curl http://localhost:80/api/health       # {"ok":true}
+curl -X POST http://localhost:80/api/translate \
      -H "Content-Type: application/json" \
      -H "X-API-Key: тот-же-ключ-что-в-.env" \
      -d '{"text":"hello"}'
@@ -183,26 +110,38 @@ curl -X POST https://твой-домен/api/translate \
 открой шестерёнку в шапке приложения и впиши тот же ключ один раз, иначе
 запросы будут падать с 401.
 
-## 10. Ежедневный бэкап (крон)
+## 8. Ежедневный бэкап (крон)
+
+Данные в docker-томе `postgres_data` — дампим через контейнер `bd`:
 
 ```bash
 crontab -e
 ```
 ```
-0 3 * * * pg_dump -U wordbook_user -h localhost wordbook > /home/твой-пользователь/backups/wordbook-$(date +\%F).sql
+0 3 * * * docker compose -f /путь/до/wordbook/docker-compose.yaml exec -T bd pg_dump -U ${POSTGRES_USER} ${POSTGRES_NAME} > /home/твой-пользователь/backups/wordbook-$(date +\%F).sql
 ```
 
 Дальше — по желанию: копировать эти дампы куда-то за пределы того же
 диска (см. `INFRA.md`, раздел про бэкапы).
 
-## 11. (Опционально) уведомления, если backend упал
+## 9. (Опционально) уведомления, если backend упал
 
 ```bash
 crontab -e
 ```
 ```
-*/5 * * * * HEALTH_URL=https://твой-домен/api/health TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=... /путь/до/wordbook/backend/scripts/health-check.sh
+*/5 * * * * HEALTH_URL=http://localhost:80/api/health TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=... /путь/до/wordbook/backend/scripts/health-check.sh
 ```
 
 Настройка бота и получение `chat_id` — в комментариях самого файла
 `backend/scripts/health-check.sh`.
+
+## 10. Общие операции
+
+```bash
+docker compose up -d          # запустить всё
+docker compose ps             # статус всех контейнеров
+docker compose logs -f backend   # логи backend вживую
+docker compose pull           # подтянуть свежие образы
+docker compose down           # остановить и убрать сеть (данные сохраняются)
+```
