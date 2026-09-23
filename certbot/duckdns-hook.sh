@@ -1,3 +1,4 @@
+#!/bin/bash
 set -e
 python3 -c "
 import os, urllib.request
