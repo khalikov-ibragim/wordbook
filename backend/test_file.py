@@ -1,20 +1,42 @@
+import os
 import requests #Подключаю библиотеку request
 
 BASE = "http://localhost"
 
+def load_api_key():
+    # CI делает cp .env.example .env — ключ лежит там. Читаем его, чтобы
+    # тест работал и с включённой авторизацией (как в CI), и без неё.
+    for path in ("backend/.env", ".env"):
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("API_KEY="):
+                        value = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if value:
+                            return value
+        except FileNotFoundError:
+            continue
+    return os.environ.get("API_KEY", "")
+
 def main(): #Создание функции с именем main
+    headers = {}
+    key = load_api_key()
+    if key:
+        headers["X-API-Key"] = key
+
     # 1.  должен отвечать 200
-    r = requests.get(f"{BASE}/api/health") #Отправляет GET-запрос по адрессу и делает возврат обьекта r
+    r = requests.get(f"{BASE}/api/health", headers=headers) #Отправляет GET-запрос по адрессу и делает возврат обьекта r
     assert r.status_code == 200, f"health: ожидал 200, получил {r.status_code}" #если условие правда то ничего не происходит.Если лож то программа падает  с этим сообщением
     print(f"[OK] health -> {r.status_code}")
 
     # 2. должен отвечать 200
-    r = requests.get(f"{BASE}/api/entries") #Отправляет GET-запрос по адрессу и делает возврат обьекта r
+    r = requests.get(f"{BASE}/api/entries", headers=headers) #Отправляет GET-запрос по адрессу и делает возврат обьекта r
     assert r.status_code == 200, f"entries: ожидал 200, получил {r.status_code}" #если условие правда то ничего не происходит.Если лож то программа падает  с этим сообщением
     print(f"[OK] entries -> {r.status_code}")
 
     # 3.  должен отвечать 200
-    r = requests.get(f"{BASE}/api/entries/stats")  # Отправляет GET-запрос по адрессу и делает возврат обьекта r
+    r = requests.get(f"{BASE}/api/entries/stats", headers=headers)  # Отправляет GET-запрос по адрессу и делает возврат обьекта r
     assert r.status_code == 200, f"stats: ожидал 200, получил {r.status_code}"  # если условие правда то ничего не происходит.Если лож то программа падает  с этим сообщением
     print(f"[OK] stats -> {r.status_code}")
 
