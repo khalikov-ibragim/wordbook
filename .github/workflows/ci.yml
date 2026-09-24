@@ -3,8 +3,35 @@ on:
   push:
     branches: [main]
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy my repository
+        uses: actions/checkout@v4
+
+      - name: lint frontend dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+      - name: lint backend dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+
+      - name: lint docker-compose.yaml
+        uses: ibiqlik/action-yamllint@v3.1.1
+        with:
+          file_or_dir: docker-compose.yaml
+          config_data: "extends: relaxed"
+
+      - name: lint hooks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          find . -name "*.sh" -print0 | xargs -0 -I{} shellcheck {}
   basic:
     runs-on: ubuntu-latest
+    needs: lint
     steps:
       - name: Copy my repository
         uses: actions/checkout@v4
@@ -65,7 +92,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password:  ${{ secrets.DOCKER_PASSWORD }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: pull my docker project
         run: docker compose pull
