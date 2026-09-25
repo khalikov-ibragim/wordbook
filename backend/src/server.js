@@ -21,23 +21,13 @@ app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// Простая проверка API-ключа. Личный проект, сервер открыт наружу через
-// nginx — без этого кто угодно, кто узнает домен, мог бы читать/удалять
-// записи. Health-check намеренно выше этой строки и без ключа: cron/
-// мониторинг должен уметь проверять "жив ли процесс" без секрета.
-//
-// Если API_KEY не задан в .env — middleware пропускает всё как раньше
-// (чтобы не сломать локальную разработку из коробки), но громко
-// предупреждает при старте, см. ниже.
-app.use('/api', (req, res, next) => {
-    const expectedKey = process.env.API_KEY;
-    if (!expectedKey) return next(); // авторизация выключена — см. предупреждение при старте
-
-    const providedKey = req.get('X-API-Key');
-    if (providedKey && providedKey === expectedKey) return next();
-
-    res.status(401).json({ error: 'Неверный или отсутствующий X-API-Key' });
-});
+// Доступ к /api закрыт nginx-ом снаружи (см. backend/nginx.conf: proxy_pass
+// только на frontend-контейнер и отдельный локейшен на back за auth_basic).
+// Прямой доступ к back наружу недоступен, поэтому отдельная X-API-Key-защита
+// в middleware не нужна: она только рассинхронизирует CI и локаль, когда в
+// .env.example попадает реальный ключ. Если когда-нибудь back начнёт
+// публиковаться отдельно — включать авторизацию на уровне nginx (http_auth),
+// а не в middleware приложения.
 
 app.use('/api/translate', translateRoute);
 app.use('/api/entries', entriesRoute);
