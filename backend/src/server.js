@@ -6,6 +6,7 @@ const translateRoute = require('./routes/translate');
 const entriesRoute = require('./routes/entries');
 const dictionaryRoute = require('./routes/dictionary');
 const { ensureDictionary } = require('../scripts/ensure-dictionary');
+const { initDb } = require('./db');
 
 const app = express();
 
@@ -40,25 +41,40 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`wordbook backend слушает порт ${PORT}`);
 
-    if (!process.env.API_KEY) {
-        console.warn(
-            'ВНИМАНИЕ: API_KEY не задан в .env — API открыт без авторизации. ' +
-            'Если сервер доступен снаружи (через nginx на 443/80), задай API_KEY ' +
-            'в backend/.env и тот же ключ во фронтенде (шестерёнка в шапке приложения).'
-        );
+// Схема применяется ДО app.listen(), иначе приложение начнёт принимать запросы
+// раньше, чем появится таблица entries. Postgres и backend стартуют одновременно,
+// поэтому БД может быть ещё не готова — отсюда retry: без него первый же
+// ECONNREFUSED убил бы контейнер, а restart: always в compose поднял бы его
+// снова по кругу. Порядок в логах: "[db] schema ready" -> "слушает порт".
+async function start() {
+    const maxRetries = 15;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            await initDb();
+            console.log('[db] schema ready');
+            break;
+        } catch (err) {
+            console.error(`[startup] attempt ${attempt}/${maxRetries} failed:`, err.message);
+            if (attempt === maxRetries) process.exit(1);
+            await new Promise((r) => setTimeout(r, 2000));
+        }
     }
 
-    // Автозагрузка словаря: см. docs/INFRA.md ("Данные для словаря") и
-    // backend/.env.example. Не блокирует старт сервера — health-check и
-    // онлайн-перевод работают сразу, а словарь донаполняется в фоне.
-    // Идемпотентно: если dictionary уже не пустая, ensureDictionary() сама
-    // выйдет почти мгновенно, так что флаг можно держать включённым всегда.
-    if (process.env.AUTO_IMPORT_DICTIONARY === 'true') {
-        ensureDictionary().catch((err) => {
-            console.error('Автозагрузка словаря не удалась (сервер продолжает работать без неё):', err);
-        });
-    }
-});
+    app.listen(PORT, () => {
+        console.log(`wordbook backend слушает порт ${PORT}`);
+
+        // Автозагрузка словаря: см. docs/INFRA.md ("Данные для словаря") и
+        // backend/.env.example. Не блокирует старт сервера — health-check и
+        // онлайн-перевод работают сразу, а словарь донаполняется в фоне.
+        // Идемпотентно: если dictionary уже не пустая, ensureDictionary() сама
+        // выйдет почти мгновенно, так что флаг можно держать включённым всегда.
+        if (process.env.AUTO_IMPORT_DICTIONARY === 'true') {
+            ensureDictionary().catch((err) => {
+                console.error('Автозагрузка словаря не удалась (сервер продолжает работать без неё):', err);
+            });
+        }
+    });
+}
+
+start();

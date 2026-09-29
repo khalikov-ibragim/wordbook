@@ -1,18 +1,17 @@
+---
 services:
   frontend:
     container_name: front
     ports:
       - "80:80"
-    image: glimpl/wordbook-frontend:latest
-    build: ./frontend
+    image: glimpl/wordbook-frontend:${TAG:-latest}
     restart: always
     depends_on:
       - backend
 
 
   backend:
-    build: ./backend
-    image: glimpl/wordbook-backend:latest
+    image: glimpl/wordbook-backend:${TAG:-latest}
     container_name: back
     restart: always
     environment:
