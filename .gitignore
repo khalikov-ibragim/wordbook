@@ -20,6 +20,13 @@ npm-debug.log*
 dist/
 build/
 
+# Python (скрипты в backend/)
+__pycache__/
+*.py[cod]
+
+# Данные, которые ensure-dictionary генерирует в контейнере
+backend/data/
+
 .venv/
 
 .terraform/
