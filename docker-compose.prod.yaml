@@ -3,14 +3,14 @@ services:
   frontend:
     ports:
       - "80:80"
-    image: glimpl/wordbook-frontend:${TAG:-latest}
+    image: docker.io/glimpl/wordbook-frontend:${TAG:-latest}
     restart: always
     depends_on:
       - backend
 
 
   backend:
-    image: glimpl/wordbook-backend:${TAG:-latest}
+    image: docker.io/glimpl/wordbook-backend:${TAG:-latest}
     restart: always
     environment:
       PORT: ${PORT}
