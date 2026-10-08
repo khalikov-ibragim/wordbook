@@ -77,11 +77,11 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: push my backend
         run: |
-          docker push glimpl/wordbook-backend:${github_sha::7}
+          docker push glimpl/wordbook-backend:${GITHUB_SHA::7}
           docker push glimpl/wordbook-backend:latest
       - name: push my frontend
         run: |
-          docker push glimpl/wordbook-frontend:${github_sha::7}
+          docker push glimpl/wordbook-frontend:${GITHUB_SHA::7}
           docker push glimpl/wordbook-frontend:latest
   deploy:
     runs-on: self-hosted
