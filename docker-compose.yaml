@@ -1,7 +1,7 @@
 services:
-  frontend:
+  wordbook-frontend:
     ports:
-      - "80:80"
+      - "8080:80"
     image: glimpl/wordbook-frontend:latest
     build: ./frontend
     restart: always
@@ -9,7 +9,7 @@ services:
       - backend
 
 
-  backend:
+  wordbook-backend:
     build: ./backend
     image: glimpl/wordbook-backend:latest
     restart: always
@@ -31,7 +31,7 @@ services:
       bd:
         condition: service_healthy
 
-  bd:
+  wordbook-bd:
     image: docker.io/postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -43,7 +43,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
 
-  libretranslate:
+  wordbook-libretranslate:
     image: docker.io/libretranslate/libretranslate
     ports:
       - "5000:5000"
@@ -53,7 +53,7 @@ services:
     volumes:
       - libretranslate:/home/libretranslate/.local/share/argos-translate
 
-  pgadmin:
+  wordbook-pgadmin:
     image: docker.io/dpage/pgadmin4
     restart: always
     ports:
