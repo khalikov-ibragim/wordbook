@@ -141,7 +141,7 @@ jobs:
       - name: helm upgrade
         run: |
           helm upgrade --install wordbook ./charts --namespace wordbook --create-namespace -f ./charts/values.yaml -f "$RUNNER_TEMP/values-secrets.yaml" \
-          --set appImageTag=${GITHUB_SHA::7} --wait --rolback-on-failure --timeout 5m
+          --set appImageTag=${GITHUB_SHA::7} --wait --rollback-on-failure --timeout 5m
 
       - name: cleanup
         if: always()
