@@ -106,7 +106,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: install kubectl
-        uses: azure/setup-kubectl
+        uses: azure/setup-kubectl@v4
         with:
           version: 'v1.28.0'
 
