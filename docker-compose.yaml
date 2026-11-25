@@ -1,5 +1,6 @@
 services:
   wordbook-frontend:
+    container_name: wordbook-frontend
     ports:
       - "8080:80"
     image: glimpl/wordbook-frontend:latest
@@ -11,6 +12,7 @@ services:
 
   wordbook-backend:
     build: ./backend
+    container_name: wordbook-backend
     image: glimpl/wordbook-backend:latest
     restart: always
     environment:
@@ -32,6 +34,7 @@ services:
         condition: service_healthy
 
   wordbook-bd:
+    container_name: wordbook-bd
     image: docker.io/postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -44,6 +47,7 @@ services:
 
 
   wordbook-libretranslate:
+    container_name: wordbook-libretranslate
     image: docker.io/libretranslate/libretranslate
     ports:
       - "5000:5000"
@@ -54,6 +58,7 @@ services:
       - libretranslate:/home/libretranslate/.local/share/argos-translate
 
   wordbook-pgadmin:
+    container_name: wordbook-pgadmin
     image: docker.io/dpage/pgadmin4
     restart: always
     ports:
@@ -67,7 +72,8 @@ services:
     volumes:
       - pgadmin:/var/lib/pgadmin
 
-  cloudflared:
+  wordbook-cloudflared:
+    container_name: wordbook-cloudflared
     image: docker.io/cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel --no-autoupdate --protocol http2 --url http://frontend
