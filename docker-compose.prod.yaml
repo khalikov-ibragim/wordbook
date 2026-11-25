@@ -2,7 +2,7 @@
 services:
   frontend:
     ports:
-      - "80:80"
+      - "8080:80"
     image: docker.io/glimpl/wordbook-frontend:${TAG:-latest}
     restart: always
     depends_on:
