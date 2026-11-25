@@ -50,7 +50,7 @@ jobs:
 
       - name: wait for backend
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
           if curl -f http://localhost/api/health; then
           echo "backend ready"
             exit 0
