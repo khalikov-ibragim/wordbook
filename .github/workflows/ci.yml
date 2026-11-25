@@ -110,7 +110,10 @@ jobs:
         with:
           version: 'v1.28.0'
 
-      - name: install helm and kubeconform
+      - name: install helm
+        uses: azure/setup-helm@v4
+
+      - name: install  kubeconform
         run: | 
             wget -qO /tmp/kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz
             tar -xzf /tmp/kubeconform.tar.gz -C /tmp
