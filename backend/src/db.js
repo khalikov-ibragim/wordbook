@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 // --- Postgres (stores file metadata) ---
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'wordbook-bd',
   port: Number(process.env.DB_PORT) || 5432,
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',

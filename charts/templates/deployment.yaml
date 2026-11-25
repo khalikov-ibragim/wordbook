@@ -1,0 +1,87 @@
+{{- $fullName := include "wordbook.fullname" . -}}
+{{- range .Values.deployments }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullName }}-{{.name}}
+  labels:
+    {{- include "wordbook.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ .replicas | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "wordbook.name" $ }}
+      app.kubernetes.io/instance: {{ $.Release.Name}}
+      app.kubernetes.io/component: {{.name}}
+  {{- if .strategy}}
+  strategy:
+    type: {{ .strategy.type }}
+    rollingUpdate:
+      maxUnavailable: {{ .strategy.rollingUpdate.maxUnavailable | default 1}}
+      maxSurge: {{ .strategy.rollingUpdate.maxSurge | default 1}}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "wordbook.name" $ }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/component: {{ .name }}
+    spec:
+      containers:
+        - name: {{ .name }}
+          image: {{.image.repository}}:{{.image.tag}}
+        {{ with .readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{ with .livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{- if .command}}
+          command:
+            {{- toYaml .command | nindent 12 }}
+        {{- else if .args}}
+          args:
+            {{- toYaml .args | nindent 12 }}
+        {{- end }}
+        {{- if .port}}
+          ports:
+            - name: http
+              containerPort: {{.service.targetPort | default .port }}
+              protocol: TCP
+        {{- end }}
+        {{- if .envFromSecret}}
+          envFrom:
+            - secretRef:
+                name: {{$fullName}}-secrets
+        {{- end }}
+        {{- if .resources}}
+          resources:
+            {{- toYaml .resources | nindent 12}} #вставляем список
+          {{- end }}
+          {{- if or .persistence .extraVolumeMounts }}
+          volumeMounts:
+          {{- if and .persistence .persistence.enabled}}
+            - name: data
+              mountPath: {{.persistence.mountPath}}
+          {{- end }}
+        {{- with .extraVolumeMounts }}
+          {{- toYaml . | nindent 12}}
+        {{- end }}
+        {{- end}}
+  {{- if or .persistence .extraVolumeMounts }}
+      volumes:
+    {{- if and .persistence .persistence.enabled}}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{$fullName}}-{{.name}}
+    {{- end}}
+    {{- range .extraVolumes}}
+      - name: {{ .name}}
+        configMap:
+          name: {{ .configMap.name }}
+      {{- end }}
+    {{- end}}
+{{- end }}

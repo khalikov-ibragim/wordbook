@@ -48,7 +48,18 @@ jobs:
       - name: check the container
         run: docker compose ps -a
 
-
+      - name: wait for backend
+        run: |
+          for i in $(seq 1 30); do
+          if curl -f http://localhost/api/health; then
+          echo "backend ready"
+            exit 0
+          fi
+          echo "waiting... attempt $i"
+          sleep 2
+          done
+          echo "backend did not start in time"
+          exit 1
 
       - name: testing working my project
         run: sudo apt-get update && sudo apt-get install -y python3-requests

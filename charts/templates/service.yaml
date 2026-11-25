@@ -1,0 +1,26 @@
+{{- $fullName := include "wordbook.fullname" . -}} #Создаем переменную с fullname
+{{- range .Values.deployments }}
+{{- if (.service | default dict).enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-{{ .name }}
+  labels:
+    {{- include "wordbook.labels" $ | nindent 4 }}
+spec:
+  type: {{ .service.type | default "ClasterIP" }}
+  selector:
+    app.kubernetes.io/name: {{ include "wordbook.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ .name }}
+  ports:
+    - port: {{ .service.port | default .port }}
+      targetPort: {{ .service.targetPort | default .port }}
+      {{- if .service.nodePort }}
+      nodePort: {{ .service.nodePort }}
+      {{- end }}
+      protocol: {{ .service.protocol | default "TCP" }}
+      name: http
+  {{- end }}
+  {{- end }}

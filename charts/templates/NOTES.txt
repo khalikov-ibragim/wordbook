@@ -1,0 +1,24 @@
+🎉 {{ .Chart.Name }} успешно установлен!
+
+📦 Релиз: {{ .Release.Name }}
+🏷  Версия чарта: {{ .Chart.Version }}
+{{- if .Chart.AppVersion }}
+🚀 Версия приложения: {{ .Chart.AppVersion }}
+{{- end }}
+
+🌐 Доступ к приложению:
+  kubectl get svc -n {{ .Release.Namespace }}
+  kubectl port-forward svc/{{ include "wordbook.fullname" . }}-frontend 8080:80 -n {{ .Release.Namespace }}
+  Открой: http://wordbook-frontend:8080
+
+🗄️ Консоль libretranslate:
+  kubectl port-forward svc/{{ include "wordbook.fullname" . }}-libretranslate 5000:5000 -n {{ .Release.Namespace }}
+  Открой: http://10.81.6.42:30901
+
+📊 Логи backend:
+  kubectl logs -l app.kubernetes.io/component=backend -n {{ .Release.Namespace }} -f
+
+🔧 Полезные команды:
+  helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  helm get values {{ .Release.Name }} -n {{ .Release.Namespace }}
+  helm rollback {{ .Release.Name }} 1 -n {{ .Release.Namespace }}
