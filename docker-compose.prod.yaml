@@ -7,7 +7,7 @@ services:
     image: docker.io/glimpl/wordbook-frontend:${TAG:-latest}
     restart: always
     depends_on:
-      - backend
+      - wordbook-backend
 
 
   wordbook-backend:
@@ -29,7 +29,7 @@ services:
       DICTIONARY_SOURCE_FILES: ${DICTIONARY_SOURCE_FILES}
       DEVICE_BUNDLE_LIMIT_PER_FILE: ${DEVICE_BUNDLE_LIMIT_PER_FILE}
     depends_on:
-      bd:
+      wordbook-bd:
         condition: service_healthy
 
   wordbook-bd:
@@ -66,7 +66,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     depends_on:
-      bd:
+      wordbook-bd:
         condition: service_healthy
     volumes:
       - pgadmin:/var/lib/pgadmin
@@ -77,7 +77,7 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate --protocol http2 --url http://frontend
     depends_on:
-      - frontend
+      - wordbook-frontend
 
 
 volumes:
