@@ -9,26 +9,39 @@ jobs:
       - name: Copy my repository
         uses: actions/checkout@v4
 
-      - name: lint frontend dockerfile
+      - name: dockerfile lint frontend dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: frontend/Dockerfile
-      - name: lint backend dockerfile
+      - name: dockerfile lint backend dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: backend/Dockerfile
 
-      - name: lint docker-compose.yaml
+      - name: yaml lint docker-compose.yaml
         uses: ibiqlik/action-yamllint@v3.1.1
         with:
           file_or_dir: docker-compose.yaml
           config_data: "extends: relaxed"
 
-      - name: lint hooks
+      - name: lint hooks and install kubeform
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
           find . -name "*.sh" -print0 | xargs -0 -I{} shellcheck {}
+          wget -qO /tmp/kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          sudo chmod +x /usr/local/bin/kubeconform
+
+      - name: install helm
+        uses: azure/setup-helm@v4
+
+      - name: run helm lint and kubeconform
+        run: |
+          helm lint ./charts -f ./charts/values.yaml
+          helm template wordbook ./charts -f ./charts/values.yaml | kubeconform -strict -summary
+
   basic:
     runs-on: ubuntu-latest
     needs: lint
@@ -92,13 +105,41 @@ jobs:
       - name: Run my repository
         uses: actions/checkout@v4
 
-      - name: Login to dockerhub
-        uses: docker/login-action@v3
+      - name: install kubectl
+        uses: azure/setup-kubectl
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          version: 'v1.28.0'
 
-      - name: pull my docker project
-        run: docker compose pull
-      - name: start containers
-        run: docker compose up -d
+      - name: install helm and kubeconform
+        run: | 
+            wget -qO /tmp/kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz
+            tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+            sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+            sudo chmod +x /usr/local/bin/kubeconform
+
+      - name: connect to my k3 cluster
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+        run: |
+          echo "$KUBE_CONFIG_DATA" > /tmp/kubeconfig.yaml
+          export KUBECONFIG=/tmp/kubeconfig.yaml
+          kubectl cluster-info
+
+      - name: secret values
+        env:
+          HELM_SECRETS: ${{ secrets.WORDBOOK_SECRETS }}
+        run: |
+          umask 077
+          printf '%s\n' "$HELM_SECRETS" > "$RUNNER_TEMP/values-secrets.yaml"
+
+      - name: run helm and kubeconform
+        run: helm template wordbook ./charts -f ./charts/values.yaml -f "$RUNNER_TEMP/values-secrets.yaml" | kubeconform -strict -summary
+          
+      - name: helm upgrade
+        run: |
+          helm upgrade --install wordbook ./charts --namespace wordbook --create-namespace -f ./charts/values.yaml -f "$RUNNER_TEMP/values-secrets.yaml" \
+          -- set appImageTag=${{GITHUB_SHA::7}} --wait --rolback-on-failure --timeout 5m
+
+      - name: cleanup
+        if: always()
+        run: rm -f "/tmp/kubeconfig.yaml" "$RUNNER_TEMP/values-secrets.yaml"
