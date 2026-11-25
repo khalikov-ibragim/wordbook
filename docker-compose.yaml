@@ -15,8 +15,9 @@ services:
     container_name: wordbook-backend
     image: glimpl/wordbook-backend:latest
     restart: always
+    ports:
+      - "3000:3000"
     environment:
-      PORT: ${PORT}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
       AUTO_IMPORT_DICTIONARY: ${AUTO_IMPORT_DICTIONARY}
       DB_HOST: ${DB_HOST}
