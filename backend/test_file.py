@@ -1,7 +1,7 @@
 import os
 import requests #Подключаю библиотеку request
 
-BASE = "http://wordbook-backend"
+BASE = "http://localhost:3000"
 
 def load_api_key():
     # CI делает cp .env.example .env — ключ лежит там. Читаем его, чтобы
