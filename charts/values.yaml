@@ -5,7 +5,7 @@ deployments:
     replicas: 2
     image:
       repository: glimpl/wordbook-frontend
-      tag: latest #После окончания переписания на k3s заменить на правильный тег
+      tag: 6c6a7be #После окончания переписания на k3s заменить на правильный тег
     imagePullPolicy: IfNotPresent
     strategy:
       type: RollingUpdate
@@ -34,7 +34,7 @@ deployments:
     replicas: 3
     image:
       repository: glimpl/wordbook-backend
-      tag: latest
+      tag: 6c6a7be
     imagePullPolicy: IfNotPresent
     strategy:
       type: RollingUpdate
