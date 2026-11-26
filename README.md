@@ -1,67 +1,142 @@
 # Wordbook
 
-Self-hosted PWA dictionary (EN↔RU) with offline support, built for daily language learning.
+Личный PWA-словарь (EN↔RU) с офлайн-поддержкой, серверным словарём в PostgreSQL и опциональным онлайн-переводом через LibreTranslate.
 
-## Features
+Проект поддерживает два режима запуска:
+- **Docker/Podman Compose** — для локальной разработки и быстрого старта;
+- **Kubernetes (k3s) + Helm** — основной режим развёртывания, чарт лежит в `charts/`.
 
-- **PWA** — installable on phone/desktop, works offline
-- **IndexedDB** — offline word storage and sync queue
-- **LibreTranslate** — self-hosted translation (Argos models)
-- **PostgreSQL** — word storage with trigram search (`pg_trgm`)
-- **Cloudflare Tunnel** — public HTTPS access without port forwarding
-- **TLS** — HTTPS via Cloudflare Tunnel
-- **Telegram alerts** — health-check notifications
-- **API Key auth** — simple header-based authentication
+## Возможности
 
-## Stack
+- **PWA** — устанавливается на телефон/десктоп, работает офлайн.
+- **IndexedDB** — локальное хранение записей и очередь синхронизации.
+- **Перевод по цепочке**: онлайн (LibreTranslate) → серверный словарь PostgreSQL → офлайн-словарь устройства → ручной ввод.
+- **PostgreSQL** — хранение записей и серверного словаря.
+- **LibreTranslate** — self-hosted перевод (Argos-модели).
+- **Cloudflare Tunnel** — публичный HTTPS-доступ без проброса портов (в compose/k8s-манифестах).
+- **Helm-чарт** — деплой в k3s с ConfigMap/Secret/PVC/HPA/Service.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Vanilla JS, PWA (Service Worker + Manifest), IndexedDB |
+## Стек
+
+| Слой | Технология |
+|------|------------|
+| Frontend | Vanilla JS, PWA (Service Worker + Manifest), IndexedDB, Nginx |
 | Backend | Node.js, Express, PostgreSQL |
-| Translation | LibreTranslate (self-hosted) |
-| Reverse Proxy | Nginx (frontend container) |
-| TLS | Cloudflare Tunnel |
-| Tunnel | Cloudflare Tunnel (cloudflared) |
-| Database | PostgreSQL 16 with `pg_trgm` extension |
+| Перевод | LibreTranslate (self-hosted) + словарь в Postgres + офлайн-бандл на устройстве |
+| База данных | PostgreSQL 16 |
+| Инфраструктура | Docker Compose, Kubernetes (k3s), Helm |
+| CI/CD | GitHub Actions, Docker Hub, kubeconform, Helm deploy |
 
-## Quick Start
+## Структура репозитория
+
+```text
+.
+├── backend/                  # Node.js/Express API, скрипты словаря, Dockerfile
+├── frontend/                 # PWA: HTML/CSS/JS, nginx.conf, Dockerfile
+├── charts/                   # Helm-чарт для k3s
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values-secrets.example.yaml
+│   └── templates/
+├── docs/                     # Инфраструктура, логика, настройка сервера
+├── .github/workflows/ci.yml  # lint + compose-тесты + push + helm deploy
+├── docker-compose.yaml       # Локальный/dev запуск
+├── .env.example              # Пример env для Docker Compose
+└── README.md
+```
+
+## Быстрый старт (Docker Compose)
 
 ```bash
-# 1. Clone
+# 1. Клонировать
 git clone https://github.com/khalikov-ibragim/wordbook.git
 cd wordbook
 
-# 2. Configure
+# 2. Подготовить env
 cp .env.example .env
-# Edit .env with your values
+# Отредактируй .env под свои значения
 
-# 3. Run
+# 3. Запустить
 docker compose up -d
 
-# 4. Access
-# Local: http://localhost
-# Public: https://your-domain.duckdns.org (after TLS setup)
+# 4. Проверить
+docker compose ps
+curl http://localhost:3000/api/health
 ```
 
-## Environment Variables
+После запуска:
+- Frontend: `http://localhost:8080`
+- Backend API: `http://localhost:3000/api/health`
+- pgAdmin: `http://localhost:4567`
+- LibreTranslate: `http://localhost:5000`
 
-See `.env.example` for all required variables. Key ones:
+> Порты и имена сервисов соответствуют `docker-compose.yaml`. В Helm/k3s используются NodePort/ClusterIP из `charts/values.yaml`.
 
-| Variable | Description |
-|----------|-------------|
-| `POSTGRES_DB` | Database name |
-| `POSTGRES_USER` | Database user |
-| `POSTGRES_PASSWORD` | Database password |
-| `API_KEY` | API authentication key (generate with `openssl rand -hex 24`) |
-| `DUCKDNS_TOKEN` | DuckDNS token for dynamic DNS |
+## Развёртывание в Kubernetes (Helm)
 
-## Documentation
+Чарт находится в `charts/`. Перед установкой подготовь файл со секретами по образцу:
 
-- `docs/INFRA.md` — infrastructure architecture, port table, security rationale
-- `docs/LOGIC.md` — application logic and data flow
-- `docs/SERVER_SETUP.md` — step-by-step server deployment guide
+```bash
+cp charts/values-secrets.example.yaml charts/values-secrets.yaml
+# Заполни реальные значения
+```
 
-## License
+Установка/обновление:
 
-Data from [OpenRussian.org](https://openrussian.org/) — CC BY-SA 4.0 (attribution required).
+```bash
+helm upgrade --install wordbook ./charts \
+  --namespace wordbook --create-namespace \
+  -f ./charts/values.yaml \
+  -f ./charts/values-secrets.yaml
+```
+
+Полезные проверки:
+
+```bash
+helm lint ./charts -f ./charts/values.yaml
+helm template wordbook ./charts -f ./charts/values.yaml -f ./charts/values-secrets.yaml | kubeconform -strict -summary
+kubectl get pods,svc,pvc -n wordbook
+```
+
+## Переменные окружения
+
+### Docker Compose
+
+Источник: `.env.example`. Ключевые переменные:
+
+| Переменная | Назначение |
+|------------|------------|
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Подключение backend к PostgreSQL |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Инициализация контейнера PostgreSQL |
+| `LIBRETRANSLATE_URL` | URL LibreTranslate, например `http://wordbook-libretranslate:5000/translate` |
+| `LT_LOAD_ONLY` | Языковые пары для LibreTranslate, например `en,ru` |
+| `FRONTEND_ORIGIN` | CORS-origin фронтенда (для same-origin через nginx обычно не нужен) |
+| `AUTO_IMPORT_DICTIONARY` | Автозагрузка словаря при старте backend |
+| `DICTIONARY_SOURCE_*`, `DEVICE_BUNDLE_LIMIT_PER_FILE` | Настройки источника и размера офлайн-бандла |
+| `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | Доступ к pgAdmin |
+
+### Helm
+
+Секреты передаются через `charts/values-secrets.yaml` (см. `charts/values-secrets.example.yaml`) и рендерятся в Kubernetes Secret. В CI реальный файл создаётся из GitHub Secret во временной директории `$RUNNER_TEMP` и не коммитится.
+
+## CI/CD
+
+Workflow: `.github/workflows/ci.yml`.
+
+| Job | Что делает |
+|-----|------------|
+| `lint` | hadolint для Dockerfile, yamllint для compose, shellcheck, helm lint + kubeconform |
+| `basic` | Сборка compose, запуск, ожидание `/api/health`, Python-тест, push образов в Docker Hub с `latest` и `${GITHUB_SHA::7}` |
+| `deploy` | Деплой в k3s через Helm (`helm upgrade --install`, `--wait`, `--rollback-on-failure`) |
+
+Для deploy используются GitHub Secrets: `KUBE_CONFIG_DATA`, `WORDBOOK_SECRETS`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`.
+
+## Документация
+
+- [`docs/INFRA.md`](docs/INFRA.md) — инфраструктура, сервисы, порты, env, данные, бэкапы.
+- [`docs/LOGIC.md`](docs/LOGIC.md) — логика перевода, статусы записей, синхронизация.
+- [`docs/SERVER_SETUP.md`](docs/SERVER_SETUP.md) — запуск локально, в Compose и через Helm/k3s.
+
+## Лицензия/данные
+
+Данные словаря по умолчанию берутся из [OpenRussian.org / Badestrand/russian-dictionary](https://github.com/Badestrand/russian-dictionary), лицензия CC BY-SA 4.0. При публичном использовании нужна атрибуция.
