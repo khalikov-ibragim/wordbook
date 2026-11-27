@@ -30,5 +30,5 @@ spec:
           type: Utilization
           averageUtilization: {{ .autoscaling.targetMemoryUtilizationPercentage }}
     {{- end }}
-{{- end }}
   {{- end }}
+{{- end }}
