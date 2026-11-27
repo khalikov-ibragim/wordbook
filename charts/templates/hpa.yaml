@@ -1,4 +1,5 @@
-{{- if (.autoscaling | default dict).enabled }}
+{{- range .Values.deployments}}
+{{- if and .autoscaling  .autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -30,3 +31,4 @@ spec:
           averageUtilization: {{ .autoscaling.targetMemoryUtilizationPercentage }}
     {{- end }}
 {{- end }}
+  {{- end }}
